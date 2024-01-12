@@ -1,9 +1,10 @@
-import os
+port os
 import csv
 import pprint
 import chromadb
 
 from typing import List, Tuple
+from csv import reader
 
 # ------------------------------------------------------------------------------
 # TODO Functions - Implement the logic as per instructions
@@ -31,7 +32,19 @@ def get_embeddings_from_csv(
     - Generate a unique ID for each document (e.g., using the line number).
     """
     # Implement your code here
-    raise NotImplementedError("This function is not yet implemented.")
+    line = 0
+    documents = []
+    metadatas = []
+    ids = []
+    for row in csv_file_data:
+        if line == 0:
+            line += 1
+            continue
+        documents.append(row[1])
+        metadatas.append({"title": row[0]})
+        ids.append(str(line))
+        line += 1
+    return (documents, metadatas, ids)
 
 
 def get_chromadb_collection(
@@ -56,7 +69,14 @@ def get_chromadb_collection(
     - Add the documents, metadatas, and ids to the collection using the collection.add method.
     """
     # Implement your code here
-    raise NotImplementedError("This function is not yet implemented.")
+    client = chromadb.PersistentClient("./chroma")
+    for collection in client.list_collections():
+        if collection.name == "semantic-lab":
+            client.delete_collection(name="semantic-lab")
+            break
+    collection = client.create_collection(name="semantic-lab")
+    collection.add(documents=documents, metadatas=metadatas, ids=ids)
+    return collection
 
 
 def get_collection_query(user_input: str) -> chromadb.QueryResult:
@@ -76,74 +96,47 @@ def get_collection_query(user_input: str) -> chromadb.QueryResult:
     - Return the query result.
     """
     # Implement your code here
-    raise NotImplementedError("This function is not yet implemented.")
+    collection = chromadb.PersistentClient("./chroma").get_collection(name="semantic-lab")
+    return collection.query(query_texts=[user_input], n_results=5)
 
 
 # ------------------------------------------------------------------------------
-# Starter Code - TOUCH AT YOUR OWN RISK!
+# Starter Code - Do not modify
 # ------------------------------------------------------------------------------
 
 
-def clear_screen():
+def read_file_from_folder(csv_file: str) -> List[List[str]]:
     """
-    Clears the terminal screen.
-
-    This function uses a system call to clear the terminal screen. The command
-    differs depending on the operating system: 'cls' for Windows ('nt') and 'clear'
-    for Unix/Linux.
-    """
-    os.system("cls" if os.name == "nt" else "clear")
-
-
-def read_file_from_folder(folder_name: str) -> List[List[str]]:
-    """
-    Reads the first .csv file from a specified folder and returns its content.
-
-    The function constructs an absolute path to the specified folder, relative
-    to the script's location. It then reads the first CSV file found in this folder
-    and returns its contents as a list of rows.
+    Reads a .csv file from a directory and returns its content.
 
     Parameters:
-    folder_name (str): The name of the folder from which to read the .csv file.
+    csv_file (str): The path to the .csv file relative to the root directory
 
     Returns:
     list: A list of rows from the CSV file, where each row is represented as a list.
     """
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    folder_path = os.path.join(script_dir, "..", folder_name)
-
-    # Check if the folder contains any files
-    try:
-        file_name = next(
-            (f for f in os.listdir(folder_path) if f.endswith(".csv")), None
-        )
-    except FileNotFoundError:
-        return []
-
-    if file_name:
-        with open(os.path.join(folder_path, file_name)) as file:
-            return list(csv.reader(file))
-
-    return []
+    with open(csv_file) as file:
+        return list(csv.reader(file))
 
 
 def main():
-    clear_screen()
 
-    print("Embeddings...\n")
+    print("getting csv", end="\n")
 
-    # Read the files from the resources folder
-    file_data = read_file_from_folder("resources")
-
+    # Read the files from the resources folder (don't move this csv file)
+    file_data = read_file_from_folder("./resources/menu_items.csv")
+    
+    print("separating csv into docs, metadata, and ids", end="\n")
+    
     # Get the embeddings from the csv files
     documents, metadatas, ids = get_embeddings_from_csv(file_data)
+    
+    print("initializing collection", end="\n")
 
     # Initializing the collection
     collection = get_chromadb_collection(documents, metadatas, ids)
 
     while True:
-        clear_screen()
-
         # Get user input
         user_input = input("What are your taste buds craving today? (x to cancel): ")
 
